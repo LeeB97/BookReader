@@ -1,5 +1,11 @@
 package com.leeb.bookreader.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Icon
@@ -22,6 +29,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -51,73 +60,90 @@ fun SearchBar(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
+            .shadow(elevation = 8.dp)
             .zIndex(10f),
-        shadowElevation = 8.dp,
-        color = Color.DarkGray.copy(alpha = 0.95f)
+        color = MaterialTheme.colorScheme.surface
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(8.dp)
+                .padding(16.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // Search input field
+                // Search input field with rounded corners
                 TextField(
                     value = query,
                     onValueChange = onQueryChange,
                     modifier = Modifier
                         .weight(1f)
-                        .focusRequester(focusRequester),
-                    placeholder = { Text("Search text...") },
+                        .focusRequester(focusRequester)
+                        .clip(MaterialTheme.shapes.medium),
+                    placeholder = { 
+                        Text(
+                            "Search text...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        ) 
+                    },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = { onSearch() }),
                     colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        focusedIndicatorColor = Color.Transparent,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedPlaceholderColor = Color.White.copy(alpha = 0.4f),
-                        unfocusedPlaceholderColor = Color.White.copy(alpha = 0.4f),
-                        cursorColor = Color.White.copy(alpha = 0.7f),
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                        focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+                        cursorColor = MaterialTheme.colorScheme.primary
                     ),
                     leadingIcon = {
                         Icon(
                             painterResource(id = R.drawable.round_search_24),
                             contentDescription = "Search",
-                            tint = Color.White
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
                         )
-                    }
+                    },
+                    textStyle = MaterialTheme.typography.bodyLarge
                 )
                 
-                // Close button
-                IconButton(onClick = onClose) {
+                Spacer(modifier = Modifier.width(8.dp))
+                
+                // Close button with circular background
+                IconButton(
+                    onClick = onClose,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                ) {
                     Icon(
                         painterResource(id = R.drawable.round_close_24),
                         contentDescription = "Close Search",
-                        tint = Color.White
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
             
-            // Navigation controls for search results
-            if (resultCount > 0) {
+            // Navigation controls for search results with animation
+            AnimatedVisibility(
+                visible = resultCount > 0,
+                enter = fadeIn() + slideInVertically(),
+                exit = fadeOut() + slideOutVertically()
+            ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 8.dp),
+                        .padding(top = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.End
                 ) {
                     Text(
                         text = "${currentResultIndex + 1} of $resultCount",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     
                     Spacer(modifier = Modifier.width(16.dp))
@@ -125,26 +151,34 @@ fun SearchBar(
                     // Previous result button
                     IconButton(
                         onClick = onPrevious,
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer)
                     ) {
                         Icon(
                             painterResource(id = R.drawable.round_skip_previous_24),
                             contentDescription = "Previous Result",
-                            modifier = Modifier.size(20.dp),
-                            tint = Color.White
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
+                    
+                    Spacer(modifier = Modifier.width(8.dp))
                     
                     // Next result button
                     IconButton(
                         onClick = onNext,
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer)
                     ) {
                         Icon(
                             painterResource(id = R.drawable.round_skip_next_24),
                             contentDescription = "Next Result",
-                            modifier = Modifier.size(20.dp),
-                            tint = Color.White
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }

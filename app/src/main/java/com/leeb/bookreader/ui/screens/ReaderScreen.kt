@@ -1,5 +1,12 @@
 package com.leeb.bookreader.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -21,8 +28,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -86,14 +96,19 @@ fun ReaderScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(statusBarHeight)
-                .background(Color.White.copy(alpha = 0.2f))
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.2f))
+                .shadow(4.dp)
         )
         
         Scaffold(
             modifier = Modifier.padding(top = statusBarHeight), // Add padding for status bar
             topBar = {
-                // Show search bar when search is active
-                if (showSearch) {
+                // Show search bar when search is active with animation
+                AnimatedVisibility(
+                    visible = showSearch,
+                    enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
+                    exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut()
+                ) {
                     SearchBar(
                         query = searchQuery,
                         onQueryChange = { viewModel.searchQuery = it },
@@ -129,20 +144,32 @@ fun ReaderScreen(
                     .background(Color(settings.backgroundColor)),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 contentPadding = PaddingValues(
-                    start = 8.dp,
-                    top = 8.dp,
-                    end = 8.dp,
-                    bottom = 16.dp
+                    start = 16.dp,
+                    top = 16.dp,
+                    end = 16.dp,
+                    bottom = 24.dp
                 )
             ) {
                 itemsIndexed(paragraphs) { index, paragraph ->
                     // Check if this paragraph is a search result
                     val isSearchResult = searchResults.contains(index)
                     
+                    // Animate the card elevation and alpha for a more dynamic feel
+                    val elevation by animateFloatAsState(
+                        targetValue = if (index == currentParagraph) 8f else 1f,
+                        animationSpec = tween(durationMillis = 300)
+                    )
+                    
+                    val alpha by animateFloatAsState(
+                        targetValue = if (index == currentParagraph) 1f else 0.9f,
+                        animationSpec = tween(durationMillis = 200)
+                    )
+                    
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp)
+                            .padding(vertical = 6.dp)
+                            .alpha(alpha)
                             .clickable {
                                 // When a paragraph is clicked, update the current paragraph
                                 viewModel.currentParagraph = index
@@ -159,8 +186,9 @@ fun ReaderScreen(
                                 Color(settings.backgroundColor)
                         ),
                         elevation = CardDefaults.cardElevation(
-                            defaultElevation = if (index == currentParagraph) 8.dp else 0.dp
+                            defaultElevation = elevation.dp
                         ),
+                        shape = MaterialTheme.shapes.medium,
                         border = if (index == currentParagraph) {
                             androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
                         } else null
@@ -172,10 +200,10 @@ fun ReaderScreen(
                                 searchTerm = searchQuery,
                                 fontSize = settings.fontSize,
                                 fontColor = if (index == currentParagraph) 
-                                    MaterialTheme.colorScheme.onBackground 
+                                    MaterialTheme.colorScheme.onPrimaryContainer 
                                 else 
                                     Color(settings.fontColor),
-                                highlightColor = Color.Yellow,
+                                highlightColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.4f),
                                 fontWeight = if (index == currentParagraph) FontWeight.Bold else FontWeight.Normal
                             )
                         } else {
@@ -183,13 +211,14 @@ fun ReaderScreen(
                                 paragraph,
                                 fontSize = settings.fontSize.sp,
                                 color = if (index == currentParagraph) 
-                                    MaterialTheme.colorScheme.onBackground 
+                                    MaterialTheme.colorScheme.onPrimaryContainer 
                                 else 
                                     Color(settings.fontColor),
                                 modifier = Modifier
-                                    .padding(8.dp)
+                                    .padding(16.dp)
                                     .fillMaxWidth(),
-                                fontWeight = if (index == currentParagraph) FontWeight.Bold else FontWeight.Normal
+                                fontWeight = if (index == currentParagraph) FontWeight.Bold else FontWeight.Normal,
+                                lineHeight = (settings.fontSize * 1.4).sp
                             )
                         }
                     }
@@ -198,7 +227,12 @@ fun ReaderScreen(
         }
     }
     
-    if (showSettings) {
+    // Show settings dialog with animation
+    AnimatedVisibility(
+        visible = showSettings,
+        enter = fadeIn(animationSpec = tween(300)),
+        exit = fadeOut(animationSpec = tween(300))
+    ) {
         SettingsDialog(
             settings = settings,
             defualtValues = { viewModel.restoreDefaultSettings(context) },
@@ -258,10 +292,11 @@ fun HighlightedText(
         style = androidx.compose.ui.text.TextStyle(
             fontSize = fontSize.sp,
             color = fontColor,
-            fontWeight = fontWeight
+            fontWeight = fontWeight,
+            lineHeight = (fontSize * 1.4).sp
         ),
         modifier = Modifier
-            .padding(8.dp)
+            .padding(16.dp)
             .fillMaxWidth()
     )
 } 
