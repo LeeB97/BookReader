@@ -20,7 +20,8 @@ fun ControlBar(
     onNext: () -> Unit,
     onPrevious: () -> Unit,
     onStop: () -> Unit,
-    onSettings: () -> Unit
+    onSettings: () -> Unit,
+    onSearch: () -> Unit
 ) {
     // Use Surface to add elevation and make the control bar stand out
     Surface(
@@ -77,6 +78,17 @@ fun ControlBar(
                 Icon(
                     painterResource(id = R.drawable.round_stop_24),
                     contentDescription = "Stop",
+                    tint = Color.White,
+                    modifier = Modifier.size(28.dp) // Larger icon
+                )
+            }
+            IconButton(
+                onClick = onSearch,
+                modifier = Modifier.size(48.dp) // Larger touch target
+            ) {
+                Icon(
+                    painterResource(id = R.drawable.round_search_24),
+                    contentDescription = "Search",
                     tint = Color.White,
                     modifier = Modifier.size(28.dp) // Larger icon
                 )

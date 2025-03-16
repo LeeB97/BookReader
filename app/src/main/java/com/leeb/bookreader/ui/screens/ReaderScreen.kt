@@ -29,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.leeb.bookreader.ui.components.ControlBar
+import com.leeb.bookreader.ui.components.SearchBar
 import com.leeb.bookreader.ui.components.SettingsDialog
 import com.leeb.bookreader.viewmodel.BookReaderViewModel
 
@@ -46,6 +47,12 @@ fun ReaderScreen(
     val isSpeaking = viewModel.isSpeaking
     val showSettings = viewModel.showSettings
     val settings = viewModel.settings
+    
+    // Search state
+    val showSearch = viewModel.showSearch
+    val searchQuery = viewModel.searchQuery
+    val searchResults = viewModel.searchResults
+    val currentSearchResultIndex = viewModel.currentSearchResultIndex
     
     // Create a scroll state that we can control programmatically
     val scrollState = rememberLazyListState()
@@ -76,6 +83,21 @@ fun ReaderScreen(
         
         Scaffold(
             modifier = Modifier.padding(top = statusBarHeight), // Add padding for status bar
+            topBar = {
+                // Show search bar when search is active
+                if (showSearch) {
+                    SearchBar(
+                        query = searchQuery,
+                        onQueryChange = { viewModel.searchQuery = it },
+                        onSearch = { viewModel.searchParagraphs(searchQuery) },
+                        onClose = { viewModel.clearSearch() },
+                        onNext = { viewModel.navigateToNextSearchResult() },
+                        onPrevious = { viewModel.navigateToPreviousSearchResult() },
+                        resultCount = searchResults.size,
+                        currentResultIndex = currentSearchResultIndex
+                    )
+                }
+            },
             bottomBar = {
                 // Control bar at the bottom
                 ControlBar(
@@ -84,7 +106,8 @@ fun ReaderScreen(
                     onNext = onNext,
                     onPrevious = onPrevious,
                     onStop = onStop,
-                    onSettings = { viewModel.showSettings = true }
+                    onSettings = { viewModel.showSettings = true },
+                    onSearch = { viewModel.showSearch = true }
                 )
             },
             containerColor = Color(settings.backgroundColor),
@@ -105,6 +128,9 @@ fun ReaderScreen(
                 )
             ) {
                 itemsIndexed(paragraphs) { index, paragraph ->
+                    // Check if this paragraph is a search result
+                    val isSearchResult = searchResults.contains(index)
+                    
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -131,18 +157,33 @@ fun ReaderScreen(
                             androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
                         } else null
                     ) {
-                        Text(
-                            paragraph,
-                            fontSize = settings.fontSize.sp,
-                            color = if (index == currentParagraph) 
-                                MaterialTheme.colorScheme.onBackground 
-                            else 
-                                Color(settings.fontColor),
-                            modifier = Modifier
-                                .padding(8.dp)
-                                .fillMaxWidth(),
-                            fontWeight = if (index == currentParagraph) FontWeight.Bold else FontWeight.Normal
-                        )
+                        // Highlight search terms in the text if this is a search result
+                        if (isSearchResult && searchQuery.isNotBlank()) {
+                            HighlightedText(
+                                text = paragraph,
+                                searchTerm = searchQuery,
+                                fontSize = settings.fontSize,
+                                fontColor = if (index == currentParagraph) 
+                                    MaterialTheme.colorScheme.onBackground 
+                                else 
+                                    Color(settings.fontColor),
+                                highlightColor = Color.Yellow,
+                                fontWeight = if (index == currentParagraph) FontWeight.Bold else FontWeight.Normal
+                            )
+                        } else {
+                            Text(
+                                paragraph,
+                                fontSize = settings.fontSize.sp,
+                                color = if (index == currentParagraph) 
+                                    MaterialTheme.colorScheme.onBackground 
+                                else 
+                                    Color(settings.fontColor),
+                                modifier = Modifier
+                                    .padding(8.dp)
+                                    .fillMaxWidth(),
+                                fontWeight = if (index == currentParagraph) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
                     }
                 }
             }
@@ -161,4 +202,55 @@ fun ReaderScreen(
             onLoadContent = { viewModel.loadContent() }
         )
     }
+}
+
+@Composable
+fun HighlightedText(
+    text: String,
+    searchTerm: String,
+    fontSize: Float,
+    fontColor: Color,
+    highlightColor: Color,
+    fontWeight: FontWeight
+) {
+    val parts = text.split(searchTerm, ignoreCase = true)
+    
+    androidx.compose.foundation.text.BasicText(
+        text = androidx.compose.ui.text.buildAnnotatedString {
+            var currentIndex = 0
+            
+            for (i in parts.indices) {
+                val part = parts[i]
+                append(part)
+                currentIndex += part.length
+                
+                // Add highlighted search term if not at the end
+                if (i < parts.size - 1) {
+                    val startIndex = text.indexOf(searchTerm, currentIndex, ignoreCase = true)
+                    val endIndex = startIndex + searchTerm.length
+                    val term = text.substring(startIndex, endIndex)
+                    
+                    pushStyle(
+                        androidx.compose.ui.text.SpanStyle(
+                            background = highlightColor,
+                            color = Color.Black,
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                    append(term)
+                    pop()
+                    
+                    currentIndex = endIndex
+                }
+            }
+        },
+        style = androidx.compose.ui.text.TextStyle(
+            fontSize = fontSize.sp,
+            color = fontColor,
+            fontWeight = fontWeight
+        ),
+        modifier = Modifier
+            .padding(8.dp)
+            .fillMaxWidth()
+    )
 } 

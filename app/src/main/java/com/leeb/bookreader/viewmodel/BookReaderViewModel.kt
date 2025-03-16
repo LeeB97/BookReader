@@ -46,6 +46,12 @@ class BookReaderViewModel : ViewModel(), TextToSpeech.OnInitListener {
     var isPaused by mutableStateOf(false)
     var showSettings by mutableStateOf(false)
     
+    // Search functionality
+    var showSearch by mutableStateOf(false)
+    var searchQuery by mutableStateOf("")
+    var searchResults = mutableStateListOf<Int>()
+    var currentSearchResultIndex by mutableStateOf(-1)
+    
     // Settings
     var settings by mutableStateOf(AppSettings())
     
@@ -282,6 +288,60 @@ class BookReaderViewModel : ViewModel(), TextToSpeech.OnInitListener {
         
         // Load current paragraph position
         currentParagraph = sharedPreferences.getInt(KEY_CURRENT_PARAGRAPH, 0)
+    }
+    
+    fun searchParagraphs(query: String) {
+        if (query.isBlank()) {
+            searchResults.clear()
+            currentSearchResultIndex = -1
+            return
+        }
+        
+        searchQuery = query
+        searchResults.clear()
+        
+        // Find all paragraphs containing the search query (case insensitive)
+        paragraphs.forEachIndexed { index, paragraph ->
+            if (paragraph.contains(query, ignoreCase = true)) {
+                searchResults.add(index)
+            }
+        }
+        
+        // Reset search result index
+        currentSearchResultIndex = if (searchResults.isNotEmpty()) 0 else -1
+        
+        // Navigate to the first result if found
+        if (currentSearchResultIndex >= 0) {
+            currentParagraph = searchResults[currentSearchResultIndex]
+            saveCurrentParagraph(currentParagraph)
+        }
+    }
+    
+    fun navigateToNextSearchResult() {
+        if (searchResults.isEmpty()) return
+        
+        currentSearchResultIndex = (currentSearchResultIndex + 1) % searchResults.size
+        currentParagraph = searchResults[currentSearchResultIndex]
+        saveCurrentParagraph(currentParagraph)
+    }
+    
+    fun navigateToPreviousSearchResult() {
+        if (searchResults.isEmpty()) return
+        
+        currentSearchResultIndex = if (currentSearchResultIndex <= 0) 
+            searchResults.size - 1 
+        else 
+            currentSearchResultIndex - 1
+            
+        currentParagraph = searchResults[currentSearchResultIndex]
+        saveCurrentParagraph(currentParagraph)
+    }
+    
+    fun clearSearch() {
+        searchQuery = ""
+        searchResults.clear()
+        currentSearchResultIndex = -1
+        showSearch = false
     }
     
     override fun onCleared() {
