@@ -36,7 +36,7 @@ import com.leeb.bookreader.model.AppSettings
 fun SettingsDialog(
     settings: AppSettings,
     onDismiss: () -> Unit,
-    defaultValues: () -> Unit,
+    defualtValues: () -> Unit,
     onUrlChange: (String) -> Unit,
     onFontSizeChange: (Float) -> Unit,
     onFontColorChange: (Int) -> Unit,
@@ -219,4 +219,4 @@ fun ColorOption(
                 shape = MaterialTheme.shapes.extraSmall
             )
     )
-} 
+}

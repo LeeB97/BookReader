@@ -152,6 +152,7 @@ fun ReaderScreen(
     if (showSettings) {
         SettingsDialog(
             settings = settings,
+            defualtValues = { viewModel.loadSettings() },
             onDismiss = { viewModel.showSettings = false },
             onUrlChange = { viewModel.updateUrl(it) },
             onFontSizeChange = { viewModel.updateFontSize(it) },

@@ -261,7 +261,7 @@ class BookReaderViewModel : ViewModel(), TextToSpeech.OnInitListener {
         sharedPreferences.edit().putString(KEY_PARAGRAPHS, json).apply()
     }
     
-    private fun loadSettings() {
+    fun loadSettings() {
         val url = sharedPreferences.getString(KEY_URL, "https://dl.dropboxusercontent.com/s/8ndtu5xb7gr6j2p/index.html?dl=0") ?: ""
         val fontSize = sharedPreferences.getFloat(KEY_FONT_SIZE, 18f)
         val fontColor = sharedPreferences.getInt(KEY_FONT_COLOR, Color.WHITE)
