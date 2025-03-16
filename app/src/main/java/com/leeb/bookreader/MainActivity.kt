@@ -2,7 +2,6 @@ package com.leeb.bookreader
 
 import android.Manifest
 import android.content.Context
-import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Bundle
@@ -11,10 +10,10 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.viewModels
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.ViewModelProvider
 import com.leeb.bookreader.media.MediaManager
 import com.leeb.bookreader.ui.screens.ReaderScreen
@@ -25,7 +24,6 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var viewModel: BookReaderViewModel
     private lateinit var mediaManager: MediaManager
-    
     // Media control receiver
     private val mediaControlReceiver = MediaControlReceiver()
     
@@ -46,6 +44,18 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Set the status bar to be transparent
+        window.statusBarColor = android.graphics.Color.WHITE
+        
+        // Configure window to draw behind system bars
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+
+        // Make status bar icons visible against any background
+        WindowInsetsControllerCompat(window, window.decorView).let { controller ->
+            // Use light status bar icons for better visibility against dark backgrounds
+            controller.isAppearanceLightStatusBars = true
+        }
         
         // Check and request notification permission for Android 13+
         checkNotificationPermission()

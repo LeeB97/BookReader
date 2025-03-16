@@ -3,9 +3,26 @@ package com.leeb.bookreader.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -19,6 +36,7 @@ import com.leeb.bookreader.model.AppSettings
 fun SettingsDialog(
     settings: AppSettings,
     onDismiss: () -> Unit,
+    defaultValues: () -> Unit,
     onUrlChange: (String) -> Unit,
     onFontSizeChange: (Float) -> Unit,
     onFontColorChange: (Int) -> Unit,
@@ -28,10 +46,12 @@ fun SettingsDialog(
     var url by remember { mutableStateOf(settings.url) }
     
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties()) {
+        // add border radius
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color.DarkGray)
+                .background(Color.DarkGray, shape = MaterialTheme.shapes.large)
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -48,20 +68,29 @@ fun SettingsDialog(
                     unfocusedTextColor = Color.White,
                     focusedContainerColor = Color.Black,
                     unfocusedContainerColor = Color.Black
-                )
+                ),
+                shape = MaterialTheme.shapes.small
             )
             
-            Spacer(Modifier.height(8.dp))
-            
-            Button(onClick = onLoadContent) {
-                Text("Load Content")
+            Spacer(Modifier.height(10.dp))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.End,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Button(onClick = onLoadContent) {
+                    Text("Load Content")
+
+                }
             }
             
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(12.dp))
             
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
             ) {
                 Text("Font Size:", color = Color.White)
                 Slider(
@@ -70,6 +99,8 @@ fun SettingsDialog(
                     valueRange = 14f..30f
                 )
             }
+
+            Spacer(Modifier.height(12.dp))
             
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -83,7 +114,7 @@ fun SettingsDialog(
                     ColorOption(
                         color = Color.White,
                         isSelected = settings.fontColor == Color.White.toArgb(),
-                        onClick = { onFontColorChange(Color.White.toArgb()) }
+                        onClick = { onFontColorChange(Color.White.toArgb()) },
                     )
                     ColorOption(
                         color = Color.Black,
@@ -112,9 +143,13 @@ fun SettingsDialog(
             
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp)
+
             ) {
-                Text("Background Color:", color = Color.White)
+                Text("BG Color:", color = Color.White)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
@@ -148,9 +183,18 @@ fun SettingsDialog(
             }
             
             Spacer(Modifier.height(8.dp))
-            
-            Button(onClick = onDismiss) {
-                Text("Save")
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.End,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Button(onClick = defualtValues) {
+                    Text("Defaults")
+                }
+                Button(onClick = onDismiss) {
+                    Text("Close")
+                }
             }
         }
     }
@@ -165,11 +209,14 @@ fun ColorOption(
     Box(
         modifier = Modifier
             .size(30.dp)
-            .background(color)
+            .background(color, shape = MaterialTheme.shapes.extraSmall)
             .clickable(onClick = onClick)
             .border(
                 width = 2.dp,
-                color = if (isSelected) Color.Yellow else Color.Transparent
+                color = if (isSelected) Color.Yellow else {
+                    Color.Gray.copy(alpha = 0.3f)
+                },
+                shape = MaterialTheme.shapes.extraSmall
             )
     )
 } 
