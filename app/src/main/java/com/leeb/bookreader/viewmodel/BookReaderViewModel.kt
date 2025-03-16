@@ -37,6 +37,8 @@ class BookReaderViewModel : ViewModel(), TextToSpeech.OnInitListener {
         const val KEY_PARAGRAPHS = "paragraphs"
         const val KEY_SPEECH_RATE = "speechRate"
         const val KEY_VOICE_LOCALE = "voiceLocale"
+        const val KEY_FONT_FAMILY = "fontFamily"
+        const val KEY_FONT_WEIGHT = "fontWeight"
         
         private const val TAG = "BookReaderViewModel"
     }
@@ -301,6 +303,16 @@ class BookReaderViewModel : ViewModel(), TextToSpeech.OnInitListener {
         }
     }
     
+    fun updateFontFamily(fontFamily: String) {
+        settings = settings.copy(fontFamily = fontFamily)
+        saveFontFamily(fontFamily)
+    }
+    
+    fun updateFontWeight(fontWeight: androidx.compose.ui.text.font.FontWeight) {
+        settings = settings.copy(fontWeight = fontWeight)
+        saveFontWeight(fontWeight)
+    }
+    
     fun getCurrentTitle(): String {
         return if (paragraphs.isNotEmpty() && currentParagraph < paragraphs.size) {
             val text = paragraphs[currentParagraph]
@@ -344,6 +356,16 @@ class BookReaderViewModel : ViewModel(), TextToSpeech.OnInitListener {
         sharedPreferences.edit().putString(KEY_VOICE_LOCALE, localeTag).apply()
     }
     
+    private fun saveFontFamily(fontFamily: String) {
+        Log.d(TAG, "Saving font family: $fontFamily")
+        sharedPreferences.edit().putString(KEY_FONT_FAMILY, fontFamily).apply()
+    }
+    
+    private fun saveFontWeight(fontWeight: androidx.compose.ui.text.font.FontWeight) {
+        Log.d(TAG, "Saving font weight: $fontWeight")
+        sharedPreferences.edit().putInt(KEY_FONT_WEIGHT, fontWeight.weight).apply()
+    }
+    
     private fun saveCurrentParagraph(position: Int) {
         sharedPreferences.edit().putInt(KEY_CURRENT_PARAGRAPH, position).apply()
     }
@@ -355,14 +377,28 @@ class BookReaderViewModel : ViewModel(), TextToSpeech.OnInitListener {
     }
     
     private fun loadSettings() {
-        val url = sharedPreferences.getString(KEY_URL, "https://dl.dropboxusercontent.com/s/8ndtu5xb7gr6j2p/index.html?dl=0") ?: ""
-        val fontSize = sharedPreferences.getFloat(KEY_FONT_SIZE, 18f)
-        val fontColor = sharedPreferences.getInt(KEY_FONT_COLOR, Color.WHITE)
-        val backgroundColor = sharedPreferences.getInt(KEY_BG_COLOR, Color.BLACK)
-        val speechRate = sharedPreferences.getFloat(KEY_SPEECH_RATE, 1.0f)
-        val voiceLocale = sharedPreferences.getString(KEY_VOICE_LOCALE, Locale.US.toLanguageTag()) ?: Locale.US.toLanguageTag()
+        val url = sharedPreferences.getString(KEY_URL, settings.url) ?: settings.url
+        val fontSize = sharedPreferences.getFloat(KEY_FONT_SIZE, settings.fontSize)
+        val fontColor = sharedPreferences.getInt(KEY_FONT_COLOR, settings.fontColor)
+        val backgroundColor = sharedPreferences.getInt(KEY_BG_COLOR, settings.backgroundColor)
+        val speechRate = sharedPreferences.getFloat(KEY_SPEECH_RATE, settings.speechRate)
+        val voiceLocale = sharedPreferences.getString(KEY_VOICE_LOCALE, settings.voiceLocale) ?: settings.voiceLocale
+        val fontFamily = sharedPreferences.getString(KEY_FONT_FAMILY, settings.fontFamily) ?: settings.fontFamily
+        val fontWeightValue = sharedPreferences.getInt(KEY_FONT_WEIGHT, settings.fontWeight.weight)
+        val fontWeight = androidx.compose.ui.text.font.FontWeight(fontWeightValue)
         
-        settings = AppSettings(url, fontSize, fontColor, backgroundColor, speechRate, voiceLocale)
+        settings = settings.copy(
+            url = url,
+            fontSize = fontSize,
+            fontColor = fontColor,
+            backgroundColor = backgroundColor,
+            speechRate = speechRate,
+            voiceLocale = voiceLocale,
+            fontFamily = fontFamily,
+            fontWeight = fontWeight
+        )
+        
+        Log.d(TAG, "Settings loaded: $settings")
         
         // Update TTS settings if initialized
         if (::tts.isInitialized && isTTSReady) {
@@ -372,27 +408,19 @@ class BookReaderViewModel : ViewModel(), TextToSpeech.OnInitListener {
     }
     
     fun restoreDefaultSettings(context: Context? = null) {
-        // Create a new AppSettings with default values
         val defaultSettings = AppSettings()
         
-        // Update all settings
+        // Update all settings to default values
         updateUrl(defaultSettings.url)
         updateFontSize(defaultSettings.fontSize)
         updateFontColor(defaultSettings.fontColor)
         updateBackgroundColor(defaultSettings.backgroundColor)
         updateSpeechRate(defaultSettings.speechRate)
         updateVoiceLocale(defaultSettings.voiceLocale)
+        updateFontFamily(defaultSettings.fontFamily)
+        updateFontWeight(defaultSettings.fontWeight)
         
-        // Update the settings object
-        settings = defaultSettings
-        
-        // Update TTS settings if initialized
-        if (::tts.isInitialized && isTTSReady) {
-            tts.setSpeechRate(defaultSettings.speechRate)
-            updateTTSVoice()
-        }
-        
-        // Show toast notification if context is provided
+        // Show toast if context is provided
         context?.let {
             Toast.makeText(it, "Settings restored to defaults", Toast.LENGTH_SHORT).show()
         }

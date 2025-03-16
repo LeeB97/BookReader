@@ -53,12 +53,14 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.leeb.bookreader.ui.components.ControlBar
 import com.leeb.bookreader.ui.components.SearchBar
 import com.leeb.bookreader.ui.components.SettingsDialog
+import com.leeb.bookreader.ui.components.getFontFamily
 import com.leeb.bookreader.viewmodel.BookReaderViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -173,6 +175,8 @@ fun ReaderScreen(
                         fontSize = settings.fontSize,
                         fontColor = settings.fontColor,
                         backgroundColor = settings.backgroundColor,
+                        fontFamily = settings.fontFamily,
+                        fontWeight = settings.fontWeight,
                         onClick = {
                             viewModel.currentParagraph = index
                             if (viewModel.isSpeaking) {
@@ -201,6 +205,8 @@ fun ReaderScreen(
             onBackgroundColorChange = { viewModel.updateBackgroundColor(it) },
             onSpeechRateChange = { viewModel.updateSpeechRate(it) },
             onVoiceLocaleChange = { viewModel.updateVoiceLocale(it) },
+            onFontFamilyChange = { viewModel.updateFontFamily(it) },
+            onFontWeightChange = { viewModel.updateFontWeight(it) },
             onLoadContent = { viewModel.loadContent() },
             availableLocales = availableLocales
         )
@@ -217,7 +223,8 @@ fun HighlightedText(
     fontSize: Float,
     fontColor: Color,
     highlightColor: Color,
-    fontWeight: FontWeight
+    fontWeight: FontWeight,
+    fontFamily: FontFamily = FontFamily.Default
 ) {
     // Skip processing if searchTerm is empty
     if (searchTerm.isBlank()) {
@@ -229,7 +236,8 @@ fun HighlightedText(
             lineHeight = (fontSize * 1.4).sp,
             modifier = Modifier
                 .padding(16.dp)
-                .fillMaxWidth()
+                .fillMaxWidth(),
+            fontFamily = fontFamily
         )
         return
     }
@@ -254,8 +262,7 @@ fun HighlightedText(
                     pushStyle(
                         SpanStyle(
                             background = highlightColor,
-                            color = Color.Black,
-                            fontWeight = FontWeight.Bold
+                            color = Color.Black
                         )
                     )
                     append(term)
@@ -269,7 +276,8 @@ fun HighlightedText(
             fontSize = fontSize.sp,
             color = fontColor,
             fontWeight = fontWeight,
-            lineHeight = (fontSize * 1.4).sp
+            lineHeight = (fontSize * 1.4).sp,
+            fontFamily = fontFamily
         ),
         modifier = Modifier
             .padding(16.dp)
@@ -289,6 +297,8 @@ private fun ParagraphCard(
     fontSize: Float,
     fontColor: Int,
     backgroundColor: Int,
+    fontFamily: String,
+    fontWeight: FontWeight,
     onClick: () -> Unit
 ) {
     // Track if this card is being pressed
@@ -317,6 +327,9 @@ private fun ParagraphCard(
             stiffness = Spring.StiffnessLow
         )
     )
+    
+    // Use the shared getFontFamily function instead of duplicating the logic
+    val composeFontFamily = getFontFamily(fontFamily)
     
     // Function to copy text to clipboard with limit
     fun copyTextToClipboard(text: String) {
@@ -380,21 +393,21 @@ private fun ParagraphCard(
                 else 
                     Color(fontColor),
                 highlightColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.4f),
-                fontWeight = if (isCurrentParagraph) FontWeight.Bold else FontWeight.Normal
+                fontWeight = fontWeight,
+                fontFamily = composeFontFamily
             )
         } else {
             Text(
                 text = paragraph,
                 fontSize = fontSize.sp,
-                color = if (isCurrentParagraph) 
-                    MaterialTheme.colorScheme.onPrimaryContainer 
-                else 
+                color = if (isCurrentParagraph)
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                else
                     Color(fontColor),
-                modifier = Modifier
-                    .padding(16.dp)
-                    .fillMaxWidth(),
-                fontWeight = if (isCurrentParagraph) FontWeight.Bold else FontWeight.Normal,
-                lineHeight = (fontSize * 1.4).sp
+                fontWeight = fontWeight,
+                lineHeight = (fontSize * 1.4).sp,
+                modifier = Modifier.padding(16.dp),
+                fontFamily = composeFontFamily
             )
         }
     }
