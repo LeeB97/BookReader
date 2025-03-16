@@ -1,5 +1,6 @@
 package com.leeb.bookreader.ui.screens
 
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -12,8 +13,8 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
@@ -44,8 +45,11 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -291,6 +295,10 @@ private fun ParagraphCard(
     var isPressed by remember { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
     
+    // Get clipboard manager and context for toast
+    val clipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current
+    
     // Animations
     val elevation by animateFloatAsState(
         targetValue = if (isCurrentParagraph) 8f else 1f,
@@ -310,14 +318,16 @@ private fun ParagraphCard(
         )
     )
     
-    // Track press state
-    LaunchedEffect(interactionSource) {
-        interactionSource.interactions.collect { interaction ->
-            when (interaction) {
-                is PressInteraction.Press -> isPressed = true
-                is PressInteraction.Release, is PressInteraction.Cancel -> isPressed = false
-            }
+    // Function to copy text to clipboard with limit
+    fun copyTextToClipboard(text: String) {
+        val trimmedText = if (text.length > 100) {
+            text.take(100)
+        } else {
+            text
         }
+        
+        clipboardManager.setText(AnnotatedString(trimmedText))
+        Toast.makeText(context, "Text copied to clipboard", Toast.LENGTH_SHORT).show()
     }
     
     Card(
@@ -329,8 +339,23 @@ private fun ParagraphCard(
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
-                onClick = onClick
-            ),
+                onClick = { /* Handled by pointerInput */ }
+            )
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onLongPress = {
+                        copyTextToClipboard(paragraph)
+                    },
+                    onPress = {
+                        isPressed = true
+                        tryAwaitRelease()
+                        isPressed = false
+                    },
+                    onTap = {
+                        onClick()
+                    }
+                )
+            },
         colors = CardDefaults.cardColors(
             containerColor = if (isCurrentParagraph)
                 MaterialTheme.colorScheme.primaryContainer
