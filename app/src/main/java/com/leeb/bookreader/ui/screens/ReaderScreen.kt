@@ -24,8 +24,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.leeb.bookreader.ui.components.ControlBar
@@ -48,11 +50,17 @@ fun ReaderScreen(
     val showSettings = viewModel.showSettings
     val settings = viewModel.settings
     
+    // Get the current context for Toast
+    val context = LocalContext.current
+    
     // Search state
     val showSearch = viewModel.showSearch
     val searchQuery = viewModel.searchQuery
     val searchResults = viewModel.searchResults
     val currentSearchResultIndex = viewModel.currentSearchResultIndex
+    
+    // Voice state
+    val availableLocales = viewModel.availableLocales
     
     // Create a scroll state that we can control programmatically
     val scrollState = rememberLazyListState()
@@ -193,13 +201,16 @@ fun ReaderScreen(
     if (showSettings) {
         SettingsDialog(
             settings = settings,
-            defualtValues = { viewModel.loadSettings() },
+            defualtValues = { viewModel.restoreDefaultSettings(context) },
             onDismiss = { viewModel.showSettings = false },
             onUrlChange = { viewModel.updateUrl(it) },
             onFontSizeChange = { viewModel.updateFontSize(it) },
             onFontColorChange = { viewModel.updateFontColor(it) },
             onBackgroundColorChange = { viewModel.updateBackgroundColor(it) },
-            onLoadContent = { viewModel.loadContent() }
+            onSpeechRateChange = { viewModel.updateSpeechRate(it) },
+            onVoiceLocaleChange = { viewModel.updateVoiceLocale(it) },
+            onLoadContent = { viewModel.loadContent() },
+            availableLocales = availableLocales
         )
     }
 }

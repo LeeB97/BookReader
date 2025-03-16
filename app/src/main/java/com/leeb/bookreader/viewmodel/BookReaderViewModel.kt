@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.graphics.Color
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import android.speech.tts.Voice
 import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -12,6 +13,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.widget.Toast
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.leeb.bookreader.model.AppSettings
@@ -33,6 +35,8 @@ class BookReaderViewModel : ViewModel(), TextToSpeech.OnInitListener {
         const val KEY_BG_COLOR = "bgColor"
         const val KEY_CURRENT_PARAGRAPH = "currentParagraph"
         const val KEY_PARAGRAPHS = "paragraphs"
+        const val KEY_SPEECH_RATE = "speechRate"
+        const val KEY_VOICE_LOCALE = "voiceLocale"
         
         private const val TAG = "BookReaderViewModel"
     }
@@ -45,6 +49,10 @@ class BookReaderViewModel : ViewModel(), TextToSpeech.OnInitListener {
     var isSpeaking by mutableStateOf(false)
     var isPaused by mutableStateOf(false)
     var showSettings by mutableStateOf(false)
+    
+    // Available voices
+    var availableVoices = mutableStateListOf<Voice>()
+    var availableLocales = mutableStateListOf<Locale>()
     
     // Search functionality
     var showSearch by mutableStateOf(false)
@@ -109,11 +117,62 @@ class BookReaderViewModel : ViewModel(), TextToSpeech.OnInitListener {
     
     override fun onInit(status: Int) {
         isTTSReady = if (status == TextToSpeech.SUCCESS) {
-            tts.language = Locale.US
+            // Set the language from settings
+            updateTTSVoice()
+            
+            // Get available voices
+            loadAvailableVoices()
+            
+            // Set speech rate from settings
+            tts.setSpeechRate(settings.speechRate)
+            
             true
         } else {
             Log.e(TAG, "TTS initialization failed with status: $status")
             false
+        }
+    }
+    
+    private fun loadAvailableVoices() {
+        availableVoices.clear()
+        availableLocales.clear()
+        
+        // Get all available voices
+        val voices = tts.voices
+        if (voices != null) {
+            availableVoices.addAll(voices)
+            
+            // Extract unique locales from voices
+            val locales = voices.map { it.locale }.distinct()
+            availableLocales.addAll(locales)
+        } else {
+            // Fallback to default locales if voices not available
+            availableLocales.add(Locale.US)
+            availableLocales.add(Locale.UK)
+            availableLocales.add(Locale.CANADA)
+            availableLocales.add(Locale.GERMANY)
+            availableLocales.add(Locale.FRANCE)
+            availableLocales.add(Locale.ITALY)
+            availableLocales.add(Locale.JAPAN)
+            availableLocales.add(Locale.KOREA)
+            availableLocales.add(Locale.CHINA)
+        }
+    }
+    
+    private fun updateTTSVoice() {
+        try {
+            val locale = Locale.forLanguageTag(settings.voiceLocale)
+            val result = tts.setLanguage(locale)
+            
+            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                Log.e(TAG, "Language not supported: ${locale.displayName}, falling back to US English")
+                tts.language = Locale.US
+            } else {
+                Log.d(TAG, "Set TTS language to: ${locale.displayName}")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error setting TTS language: ${e.message}")
+            tts.language = Locale.US
         }
     }
     
@@ -222,6 +281,26 @@ class BookReaderViewModel : ViewModel(), TextToSpeech.OnInitListener {
         saveBackgroundColor(color)
     }
     
+    fun updateSpeechRate(rate: Float) {
+        settings = settings.copy(speechRate = rate)
+        saveSpeechRate(rate)
+        
+        // Update TTS speech rate
+        if (::tts.isInitialized && isTTSReady) {
+            tts.setSpeechRate(rate)
+        }
+    }
+    
+    fun updateVoiceLocale(localeTag: String) {
+        settings = settings.copy(voiceLocale = localeTag)
+        saveVoiceLocale(localeTag)
+        
+        // Update TTS voice
+        if (::tts.isInitialized && isTTSReady) {
+            updateTTSVoice()
+        }
+    }
+    
     fun getCurrentTitle(): String {
         return if (paragraphs.isNotEmpty() && currentParagraph < paragraphs.size) {
             val text = paragraphs[currentParagraph]
@@ -257,6 +336,14 @@ class BookReaderViewModel : ViewModel(), TextToSpeech.OnInitListener {
         sharedPreferences.edit().putInt(KEY_BG_COLOR, color).apply()
     }
     
+    private fun saveSpeechRate(rate: Float) {
+        sharedPreferences.edit().putFloat(KEY_SPEECH_RATE, rate).apply()
+    }
+    
+    private fun saveVoiceLocale(localeTag: String) {
+        sharedPreferences.edit().putString(KEY_VOICE_LOCALE, localeTag).apply()
+    }
+    
     private fun saveCurrentParagraph(position: Int) {
         sharedPreferences.edit().putInt(KEY_CURRENT_PARAGRAPH, position).apply()
     }
@@ -267,13 +354,48 @@ class BookReaderViewModel : ViewModel(), TextToSpeech.OnInitListener {
         sharedPreferences.edit().putString(KEY_PARAGRAPHS, json).apply()
     }
     
-    fun loadSettings() {
+    private fun loadSettings() {
         val url = sharedPreferences.getString(KEY_URL, "https://dl.dropboxusercontent.com/s/8ndtu5xb7gr6j2p/index.html?dl=0") ?: ""
         val fontSize = sharedPreferences.getFloat(KEY_FONT_SIZE, 18f)
         val fontColor = sharedPreferences.getInt(KEY_FONT_COLOR, Color.WHITE)
         val backgroundColor = sharedPreferences.getInt(KEY_BG_COLOR, Color.BLACK)
+        val speechRate = sharedPreferences.getFloat(KEY_SPEECH_RATE, 1.0f)
+        val voiceLocale = sharedPreferences.getString(KEY_VOICE_LOCALE, Locale.US.toLanguageTag()) ?: Locale.US.toLanguageTag()
         
-        settings = AppSettings(url, fontSize, fontColor, backgroundColor)
+        settings = AppSettings(url, fontSize, fontColor, backgroundColor, speechRate, voiceLocale)
+        
+        // Update TTS settings if initialized
+        if (::tts.isInitialized && isTTSReady) {
+            tts.setSpeechRate(speechRate)
+            updateTTSVoice()
+        }
+    }
+    
+    fun restoreDefaultSettings(context: Context? = null) {
+        // Create a new AppSettings with default values
+        val defaultSettings = AppSettings()
+        
+        // Update all settings
+        updateUrl(defaultSettings.url)
+        updateFontSize(defaultSettings.fontSize)
+        updateFontColor(defaultSettings.fontColor)
+        updateBackgroundColor(defaultSettings.backgroundColor)
+        updateSpeechRate(defaultSettings.speechRate)
+        updateVoiceLocale(defaultSettings.voiceLocale)
+        
+        // Update the settings object
+        settings = defaultSettings
+        
+        // Update TTS settings if initialized
+        if (::tts.isInitialized && isTTSReady) {
+            tts.setSpeechRate(defaultSettings.speechRate)
+            updateTTSVoice()
+        }
+        
+        // Show toast notification if context is provided
+        context?.let {
+            Toast.makeText(it, "Settings restored to defaults", Toast.LENGTH_SHORT).show()
+        }
     }
     
     private fun loadSavedParagraphs() {
