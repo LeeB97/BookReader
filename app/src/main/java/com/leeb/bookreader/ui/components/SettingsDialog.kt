@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -30,7 +29,6 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -44,7 +42,6 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -55,8 +52,8 @@ import java.util.Locale
 @Composable
 fun SettingsDialog(
     settings: AppSettings,
+    defaultValues: () -> Unit,
     onDismiss: () -> Unit,
-    defualtValues: () -> Unit,
     onUrlChange: (String) -> Unit,
     onFontSizeChange: (Float) -> Unit,
     onFontColorChange: (Int) -> Unit,
@@ -257,8 +254,9 @@ fun SettingsDialog(
                     title = "Speech Rate",
                     value = settings.speechRate,
                     onValueChange = onSpeechRateChange,
-                    valueRange = 0.5f..2.0f,
-                    valueDisplay = "%.1f".format(settings.speechRate)
+                    valueRange = 0.5f..1.5f,
+                    valueDisplay = "%.2f".format(settings.speechRate),
+                    steps = 19
                 )
                 
                 Spacer(Modifier.height(16.dp))
@@ -343,7 +341,7 @@ fun SettingsDialog(
                 ) {
                     Button(
                         onClick = {
-                            defualtValues()
+                            defaultValues()
                             onDismiss()
                         },
                         colors = ButtonDefaults.buttonColors(
@@ -373,7 +371,8 @@ fun SettingSlider(
     value: Float,
     onValueChange: (Float) -> Unit,
     valueRange: ClosedFloatingPointRange<Float>,
-    valueDisplay: String
+    valueDisplay: String,
+    steps: Int = 0
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -400,6 +399,7 @@ fun SettingSlider(
             value = value,
             onValueChange = onValueChange,
             valueRange = valueRange,
+            steps = steps,
             modifier = Modifier.fillMaxWidth(),
             colors = SliderDefaults.colors(
                 thumbColor = MaterialTheme.colorScheme.primary,

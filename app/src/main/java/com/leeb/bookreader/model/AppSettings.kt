@@ -8,6 +8,6 @@ data class AppSettings(
     val fontSize: Float = 18f,
     val fontColor: Int = Color.WHITE,
     val backgroundColor: Int = Color.BLACK,
-    val speechRate: Float = 1.0f,
+    val speechRate: Float = 0.9f,
     val voiceLocale: String = Locale.US.toLanguageTag()
 ) 
