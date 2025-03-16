@@ -56,6 +56,13 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
-    implementation("org.jsoup:jsoup:1.17.2")
-    implementation("androidx.compose.foundation:foundation:1.6.3")
+    implementation(libs.jsoup)
+    implementation(libs.androidx.foundation)
+    implementation(libs.gson)
+    
+    // Media notification dependencies
+    implementation(libs.androidx.media)
+    implementation(libs.androidx.media2.session)
+    implementation(libs.androidx.lifecycle.service)
+    implementation(libs.androidx.core)
 }

@@ -1,7 +1,11 @@
 package com.leeb.bookreader
 
+import android.Manifest
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
@@ -9,23 +13,26 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
@@ -35,8 +42,12 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import androidx.core.content.ContextCompat
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 
-class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
+class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener, MediaControlReceiver.MediaControlListener {
 
     private lateinit var tts: TextToSpeech
     private var isTTSReady by mutableStateOf(false)
@@ -55,10 +66,28 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private val KEY_BG_COLOR = "bgColor"
     private val KEY_CURRENT_PARAGRAPH = "currentParagraph"
     private val KEY_PARAGRAPHS = "paragraphs"
+    
+    // Media control receiver
+    private val mediaControlReceiver = MediaControlReceiver()
+    
+    // Permission request launcher
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            Log.d("MainActivity", "Notification permission granted")
+        } else {
+            Toast.makeText(
+                this,
+                "Notification permission denied. Media controls may not work properly.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
 
     private val utteranceProgressListener = object : UtteranceProgressListener() {
         override fun onStart(utteranceId: String?) {
-            // You can add code to perform actions on start (e.g., logging)
+
         }
 
         override fun onDone(utteranceId: String?) {
@@ -68,8 +97,11 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                     currentParagraph++
                     // Save current paragraph position when it changes
                     saveCurrentParagraph(currentParagraph)
+                    // Update notification
+                    updateMediaNotification()
                 } else {
                     isSpeaking = false
+                    stopMediaService()
                 }
             }
         }
@@ -78,15 +110,20 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         override fun onError(utteranceId: String?) {
             Log.e("TTS", "Error with utterance: $utteranceId")
             isSpeaking = false
+            stopMediaService()
         }
         override fun onError(utteranceId: String?, errorCode: Int) {
             Log.e("TTS", "Error with utterance: $utteranceId, Error code: $errorCode")
             isSpeaking = false
+            stopMediaService()
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Check and request notification permission for Android 13+
+        checkNotificationPermission()
         
         // Initialize SharedPreferences
         sharedPreferences = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -94,6 +131,27 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         tts = TextToSpeech(this, this)
         //Set the listener
         tts.setOnUtteranceProgressListener(utteranceProgressListener)
+        
+        // Register media control receiver
+        try {
+            val intentFilter = IntentFilter().apply {
+                addAction(MediaService.ACTION_PLAY_PAUSE)
+                addAction(MediaService.ACTION_NEXT)
+                addAction(MediaService.ACTION_PREVIOUS)
+                addAction(MediaService.ACTION_STOP)
+            }
+            
+            // Register with RECEIVER_NOT_EXPORTED flag
+            registerReceiver(
+                mediaControlReceiver, 
+                intentFilter,
+                Context.RECEIVER_NOT_EXPORTED
+            )
+            
+            MediaControlReceiver.setListener(this)
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error registering receiver: ${e.message}")
+        }
 
         setContent {
             val context = LocalContext.current
@@ -110,6 +168,10 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             var bgColor by remember { mutableStateOf(Color(savedBgColor.value)) }
             val coroutineScope = rememberCoroutineScope()
             
+            // Create a scroll state that we can control programmatically
+            val scrollState = rememberLazyListState()
+            val cardOffsets = remember { mutableStateMapOf<Int, Int>() }
+
             // Load saved paragraphs and current position
             LaunchedEffect(Unit) {
                 coroutineScope.launch {
@@ -132,6 +194,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                             if (currentParagraph > 0) {
                                 currentParagraph--
                                 saveCurrentParagraph(currentParagraph)
+                                updateMediaNotification()
                             }
                         }) {
                             Icon(
@@ -145,8 +208,10 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                                 tts.stop()
                                 isSpeaking = false
                                 isPaused = true
+                                updateMediaNotification()
                             } else {
                                 isSpeaking = true
+                                startMediaService()
                             }
                         }) {
                             Icon(
@@ -159,6 +224,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                             if (currentParagraph < paragraphs.size - 1) {
                                 currentParagraph++
                                 saveCurrentParagraph(currentParagraph)
+                                updateMediaNotification()
                             }
                         }) {
                             Icon(
@@ -167,11 +233,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                                 tint = Color.White
                             )
                         }
-                        IconButton(onClick = {
-                            isSpeaking = false
-                            isPaused = false
-                            tts.stop()
-                        }) {
+                        IconButton(onClick = { onStopClicked() }) {
                             Icon(
                                 painterResource(id = R.drawable.round_stop_24), 
                                 contentDescription = "Stop",
@@ -190,45 +252,84 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 floatingActionButtonPosition = FabPosition.End,
                 containerColor = bgColor
             ) { padding ->
+
                 Column(
                     modifier = Modifier
                         .padding(padding)
                         .fillMaxSize()
-                        .background(bgColor)
-                        .verticalScroll(rememberScrollState()),
+                        .background(bgColor),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    paragraphs.forEachIndexed { index, paragraph ->
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (index == currentParagraph) 
-                                    MaterialTheme.colorScheme.primaryContainer 
-                                else 
-                                    bgColor
-                            )
-                        ) {
-                            Text(
-                                paragraph,
-                                fontSize = fontSize,
-                                color = fontColor,
+                    LazyColumn(
+                        state = scrollState,  // Use LazyListState
+                        modifier = Modifier
+                            .padding(padding)
+                            .fillMaxSize()
+                            .background(bgColor),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        itemsIndexed(paragraphs) { index, paragraph ->
+                            Card(
                                 modifier = Modifier
-                                    .padding(8.dp)
-                                    .fillMaxWidth(),
-                                fontWeight = if (index == currentParagraph) FontWeight.Bold else FontWeight.Normal
-                            )
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp)
+                                    .clickable {
+                                        // When a paragraph is clicked, update the current paragraph
+                                        currentParagraph = index
+                                        saveCurrentParagraph(index)
+                                        // If speaking, stop current and start new paragraph
+                                        if (isSpeaking) {
+                                            tts.stop()
+                                            // TTS will automatically start speaking the new paragraph due to the LaunchedEffect
+                                        }
+                                        // Update notification if needed
+                                        updateMediaNotification()
+                                    }
+                                    .onGloballyPositioned { coordinates ->
+                                        val yOffset = coordinates.positionInRoot().y.toInt()
+                                        cardOffsets[index] = yOffset
+                                    },
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (index == currentParagraph)
+                                        MaterialTheme.colorScheme.primaryContainer
+                                    else
+                                        bgColor
+                                ),
+                                elevation = CardDefaults.cardElevation(
+                                    defaultElevation = if (index == currentParagraph) 8.dp else 1.dp
+                                ),
+                                border = if (index == currentParagraph) {
+                                    BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+                                } else null
+                            ) {
+                                Text(
+                                    paragraph,
+                                    fontSize = fontSize,
+                                    color = if (index == currentParagraph) MaterialTheme.colorScheme.onBackground else fontColor,
+                                    modifier = Modifier
+                                        .padding(8.dp)
+                                        .fillMaxWidth(),
+                                    fontWeight = if (index == currentParagraph) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
                         }
                     }
                 }
             }
+
             LaunchedEffect(currentParagraph, isTTSReady, isSpeaking) {
                 if (isTTSReady && isSpeaking && paragraphs.isNotEmpty() && currentParagraph < paragraphs.size) {
                     val utteranceId = this.hashCode().toString() + System.currentTimeMillis().toString()
                     val params = Bundle()
                     params.putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, utteranceId)
                     tts.speak(paragraphs[currentParagraph], TextToSpeech.QUEUE_FLUSH, params, utteranceId)
+
+                    scrollState.animateScrollToItem(currentParagraph)
+                    
+                    // Start or update media service
+                    if (isSpeaking) {
+                        startMediaService()
+                    }
                 }
             }
 
@@ -379,7 +480,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                                         }
                                         .border(
                                             width = 2.dp,
-                                            color = if (bgColor == Color.Black) Color.Yellow else Color.Transparent
+                                            color = Color.Transparent
                                         )
                                 )
                                 Box(
@@ -392,7 +493,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                                         }
                                         .border(
                                             width = 2.dp,
-                                            color = if (bgColor == Color.White) Color.Yellow else Color.Transparent
+                                            color = Color.Transparent
                                         )
                                 )
                                 Box(
@@ -405,7 +506,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                                         }
                                         .border(
                                             width = 2.dp,
-                                            color = if (bgColor == Color.DarkGray) Color.Yellow else Color.Transparent
+                                            color = Color.White
                                         )
                                 )
                                 Box(
@@ -418,7 +519,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                                         }
                                         .border(
                                             width = 2.dp,
-                                            color = if (bgColor == Color.Blue.copy(alpha = 0.7f)) Color.Yellow else Color.Transparent
+                                            color = Color.Transparent
                                         )
                                 )
                                 Box(
@@ -431,7 +532,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                                         }
                                         .border(
                                             width = 2.dp,
-                                            color = if (bgColor == Color(0xFF2D2D2D)) Color.Yellow else Color.Transparent
+                                            color = Color.Transparent
                                         )
                                 )
                             }
@@ -461,6 +562,16 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             tts.stop()
             tts.shutdown()
         }
+        
+        // Unregister receiver and stop service
+        try {
+            unregisterReceiver(mediaControlReceiver)
+            MediaControlReceiver.removeListener()
+            stopMediaService()
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error unregistering receiver: ${e.message}")
+        }
+        
         super.onDestroy()
     }
 
@@ -515,6 +626,120 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             val savedParagraphs: List<String> = gson.fromJson(json, type)
             paragraphs.clear()
             paragraphs.addAll(savedParagraphs)
+        }
+    }
+    
+    // Media service methods
+    private fun startMediaService() {
+        try {
+            val intent = Intent(this, MediaService::class.java).apply {
+                putExtra(MediaService.EXTRA_IS_PLAYING, isSpeaking)
+                putExtra(MediaService.EXTRA_TITLE, getCurrentTitle())
+            }
+            ContextCompat.startForegroundService(this, intent)
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error starting media service: ${e.message}")
+            Toast.makeText(this, "Error starting media service", Toast.LENGTH_SHORT).show()
+        }
+    }
+    
+    private fun updateMediaNotification() {
+        if (isSpeaking) {
+            try {
+                val intent = Intent(this, MediaService::class.java).apply {
+                    putExtra(MediaService.EXTRA_IS_PLAYING, isSpeaking)
+                    putExtra(MediaService.EXTRA_TITLE, getCurrentTitle())
+                }
+                ContextCompat.startForegroundService(this, intent)
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Error updating media notification: ${e.message}")
+            }
+        }
+    }
+    
+    private fun stopMediaService() {
+        try {
+            stopService(Intent(this, MediaService::class.java))
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error stopping media service: ${e.message}")
+        }
+    }
+    
+    private fun getCurrentTitle(): String {
+        return if (paragraphs.isNotEmpty() && currentParagraph < paragraphs.size) {
+            val text = paragraphs[currentParagraph]
+            if (text.length > 30) text.substring(0, 30) + "..." else text
+        } else {
+            "Book Reader"
+        }
+    }
+    
+    // MediaControlListener implementation
+    override fun onPlayPauseClicked() {
+        if (isSpeaking) {
+            tts.stop()
+            isSpeaking = false
+            isPaused = true
+        } else {
+            isSpeaking = true
+        }
+        updateMediaNotification()
+    }
+    
+    override fun onNextClicked() {
+        if (currentParagraph < paragraphs.size - 1) {
+            currentParagraph++
+            saveCurrentParagraph(currentParagraph)
+            if (isSpeaking) {
+                tts.stop()
+                // TTS will automatically start speaking the new paragraph due to the LaunchedEffect
+            }
+            updateMediaNotification()
+        }
+    }
+    
+    override fun onPreviousClicked() {
+        if (currentParagraph > 0) {
+            currentParagraph--
+            saveCurrentParagraph(currentParagraph)
+            if (isSpeaking) {
+                tts.stop()
+                // TTS will automatically start speaking the new paragraph due to the LaunchedEffect
+            }
+            updateMediaNotification()
+        }
+    }
+    
+    override fun onStopClicked() {
+        isSpeaking = false
+        isPaused = false
+        currentParagraph = 0;
+        tts.stop()
+        stopMediaService()
+    }
+
+    private fun checkNotificationPermission() {
+        when {
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED -> {
+                // Permission is already granted
+                Log.d("MainActivity", "Notification permission already granted")
+            }
+            shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS) -> {
+                // Explain to the user why we need the permission
+                Toast.makeText(
+                    this,
+                    "Notification permission is needed for media controls",
+                    Toast.LENGTH_LONG
+                ).show()
+                requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+            else -> {
+                // Request the permission
+                requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
         }
     }
 }
