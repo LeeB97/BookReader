@@ -12,5 +12,6 @@ data class AppSettings(
     val speechRate: Float = 0.9f,
     val voiceLocale: String = Locale.US.toLanguageTag(),
     val fontFamily: String = "Default",
-    var fontWeight: FontWeight = FontWeight.Normal
+    var fontWeight: FontWeight = FontWeight.Normal,
+    val htmlSelector: String = ""
 ) 

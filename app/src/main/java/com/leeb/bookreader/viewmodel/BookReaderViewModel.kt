@@ -39,6 +39,7 @@ class BookReaderViewModel : ViewModel(), TextToSpeech.OnInitListener {
         const val KEY_VOICE_LOCALE = "voiceLocale"
         const val KEY_FONT_FAMILY = "fontFamily"
         const val KEY_FONT_WEIGHT = "fontWeight"
+        const val KEY_HTML_SELECTOR = "htmlSelector"
         
         private const val TAG = "BookReaderViewModel"
     }
@@ -237,6 +238,7 @@ class BookReaderViewModel : ViewModel(), TextToSpeech.OnInitListener {
     fun loadContent() {
         viewModelScope.launch {
             paragraphs.clear()
+            Log.d(TAG, "Loading content with URL: ${settings.url} and HTML selector: ${settings.htmlSelector}")
             val newParagraphs = fetchAndParse(settings.url)
             paragraphs.addAll(newParagraphs)
             currentParagraph = 0
@@ -251,7 +253,25 @@ class BookReaderViewModel : ViewModel(), TextToSpeech.OnInitListener {
             val doc = Jsoup.connect(url).get()
             if (url.endsWith(".txt")) {
                 doc.text().split("\n").filter { it.isNotBlank() }
+            } else if(settings.htmlSelector.isNotBlank()) {
+                Log.d(TAG, "Using HTML selector: ${settings.htmlSelector}")
+                val container = doc.selectFirst(settings.htmlSelector)
+                
+                if (container != null) {
+                    Log.d(TAG, "Selector found in document")
+                    container.allElements
+                        .flatMap { it.textNodes() }
+                        .map { it.text().trim() }
+                        .filter { it.isNotBlank() }
+                } else {
+                    Log.d(TAG, "Selector not found, using body instead")
+                    doc.body().allElements
+                        .flatMap { it.textNodes() }
+                        .map { it.text().trim() }
+                        .filter { it.isNotBlank() }
+                }
             } else {
+                Log.d(TAG, "No selector, using entire body")
                 doc.body().allElements
                     .flatMap { it.textNodes() }
                     .map { it.text().trim() }
@@ -313,6 +333,11 @@ class BookReaderViewModel : ViewModel(), TextToSpeech.OnInitListener {
         saveFontWeight(fontWeight)
     }
     
+    fun updateHtmlSelector(selector: String) {
+        settings = settings.copy(htmlSelector = selector)
+        saveHtmlSelector(selector)
+    }
+    
     fun getCurrentTitle(): String {
         return if (paragraphs.isNotEmpty() && currentParagraph < paragraphs.size) {
             val text = paragraphs[currentParagraph]
@@ -366,6 +391,11 @@ class BookReaderViewModel : ViewModel(), TextToSpeech.OnInitListener {
         sharedPreferences.edit().putInt(KEY_FONT_WEIGHT, fontWeight.weight).apply()
     }
     
+    private fun saveHtmlSelector(selector: String) {
+        Log.d(TAG, "Saving HTML selector: $selector")
+        sharedPreferences.edit().putString(KEY_HTML_SELECTOR, selector).apply()
+    }
+    
     private fun saveCurrentParagraph(position: Int) {
         sharedPreferences.edit().putInt(KEY_CURRENT_PARAGRAPH, position).apply()
     }
@@ -386,6 +416,7 @@ class BookReaderViewModel : ViewModel(), TextToSpeech.OnInitListener {
         val fontFamily = sharedPreferences.getString(KEY_FONT_FAMILY, settings.fontFamily) ?: settings.fontFamily
         val fontWeightValue = sharedPreferences.getInt(KEY_FONT_WEIGHT, settings.fontWeight.weight)
         val fontWeight = androidx.compose.ui.text.font.FontWeight(fontWeightValue)
+        val htmlSelector = sharedPreferences.getString(KEY_HTML_SELECTOR, settings.htmlSelector) ?: settings.htmlSelector
         
         settings = settings.copy(
             url = url,
@@ -395,7 +426,8 @@ class BookReaderViewModel : ViewModel(), TextToSpeech.OnInitListener {
             speechRate = speechRate,
             voiceLocale = voiceLocale,
             fontFamily = fontFamily,
-            fontWeight = fontWeight
+            fontWeight = fontWeight,
+            htmlSelector = htmlSelector
         )
         
         Log.d(TAG, "Settings loaded: $settings")
@@ -419,6 +451,7 @@ class BookReaderViewModel : ViewModel(), TextToSpeech.OnInitListener {
         updateVoiceLocale(defaultSettings.voiceLocale)
         updateFontFamily(defaultSettings.fontFamily)
         updateFontWeight(defaultSettings.fontWeight)
+        updateHtmlSelector(defaultSettings.htmlSelector)
         
         // Show toast if context is provided
         context?.let {

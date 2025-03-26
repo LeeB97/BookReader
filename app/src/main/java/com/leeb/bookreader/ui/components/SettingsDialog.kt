@@ -119,10 +119,12 @@ fun SettingsDialog(
     onVoiceLocaleChange: (String) -> Unit = {},
     onFontFamilyChange: (String) -> Unit = {},
     onFontWeightChange: (FontWeight) -> Unit = {},
+    onHtmlSelectorChange: (String) -> Unit = {},
     onLoadContent: () -> Unit,
     availableLocales: List<Locale> = listOf(Locale.US)
 ) {
     var url by remember { mutableStateOf(settings.url) }
+    var htmlSelector by remember { mutableStateOf(settings.htmlSelector) }
     var showVoiceDropdown by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
     
@@ -209,7 +211,14 @@ fun SettingsDialog(
                                 url = it
                                 onUrlChange(it)
                             },
-                            onLoadContent = onLoadContent
+                            htmlSelector = htmlSelector,
+                            onHtmlSelectorChange = { 
+                                htmlSelector = it
+                                onHtmlSelectorChange(it)
+                            },
+                            onLoadContent = {
+                                onLoadContent()
+                            }
                         )
                     }
                 }
@@ -651,8 +660,13 @@ fun TTSTab(
 fun ImportTab(
     url: String,
     onUrlChange: (String) -> Unit,
+    htmlSelector: String,
+    onHtmlSelectorChange: (String) -> Unit,
     onLoadContent: () -> Unit
 ) {
+    // Debug print
+    println("ImportTab - htmlSelector: $htmlSelector")
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -663,6 +677,26 @@ fun ImportTab(
             onValueChange = onUrlChange,
             label = { Text("Content URL") },
             placeholder = { Text("Enter URL", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)) },
+            modifier = Modifier.fillMaxWidth(),
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+                unfocusedIndicatorColor = MaterialTheme.colorScheme.outline
+            ),
+            shape = MaterialTheme.shapes.small,
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodyLarge
+        )
+        
+        Spacer(Modifier.height(16.dp))
+        
+        // HTML Selector Input
+        OutlinedTextField(
+            value = htmlSelector,
+            onValueChange = onHtmlSelectorChange,
+            label = { Text("HTML Selector") },
+            placeholder = { Text("CSS Selector (e.g. #content .article)", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)) },
             modifier = Modifier.fillMaxWidth(),
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = MaterialTheme.colorScheme.surface,

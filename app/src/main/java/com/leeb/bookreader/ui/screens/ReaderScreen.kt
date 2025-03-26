@@ -207,6 +207,7 @@ fun ReaderScreen(
             onVoiceLocaleChange = { viewModel.updateVoiceLocale(it) },
             onFontFamilyChange = { viewModel.updateFontFamily(it) },
             onFontWeightChange = { viewModel.updateFontWeight(it) },
+            onHtmlSelectorChange = { viewModel.updateHtmlSelector(it) },
             onLoadContent = { viewModel.loadContent() },
             availableLocales = availableLocales
         )
